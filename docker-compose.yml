@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  mc-honeypot:
+    image: mc-honeypot:latest
+    build: .
+    ports:
+      - "25565:25565"
+    environment:
+      ADDRESS: "0.0.0.0:25565"
+      KICK_MESSAGE: "You are not Whitelisted on this Server"
+      MOTD: "A Minecraft Server"
+      PROTOCOL_VERSION: "772"
+      PROTOCOL_TEXT: "1.21.7"
+      FAVICON: ""
+      WEBHOOK_PING: ""
+      WEBHOOK_KICK: ""
+      MAX_SLOTS: "20"
+    restart: unless-stopped
