@@ -14,14 +14,13 @@ import (
 var (
 	config struct {
 		address,
-		kick_message,
+		kickMessage,
 		motd,
-		protocol_version,
-		protocol_text,
-		favicon,
-		max_slots,
-		webhook_ping,
-		webhook_kick string
+		protocolVersion,
+		protocolText,
+		maxSlots,
+		webhookPing,
+		webhookKick string
 	}
 	statusMessage, kickMessage []byte
 )
@@ -46,11 +45,8 @@ func handleConn(conn net.Conn) {
 	defer conn.Close()
 
 	var packet protocol.Packet
-	err := packet.ReadFrom(conn) // handshake packet
+	err := packet.ReadFrom(conn, 0x00) // handshake packet
 	if err != nil {
-		return
-	}
-	if packet.Id != 0 {
 		return
 	}
 
@@ -62,7 +58,7 @@ func handleConn(conn net.Conn) {
 
 	switch handshakePacket.NextState {
 	case 1:
-		err = packet.ReadFrom(conn) // status request
+		err = packet.ReadFrom(conn, 0x00) // status request
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -72,26 +68,26 @@ func handleConn(conn net.Conn) {
 		}
 
 		packet.Data = statusMessage
-		err = packet.WriteTo(conn)
+		err = packet.WriteTo(conn) // status response
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		err = packet.ReadFrom(conn)
+		err = packet.ReadFrom(conn, 1) // ping request
 		if err != nil {
 			return
 		}
 
-		err = packet.WriteTo(conn)
+		err = packet.WriteTo(conn) // ping response
 		if err != nil {
 			return
 		}
-		sendWebhook(config.webhook_ping, fmt.Sprintf(`{"embeds":[{"title":"Status","description":"IP: %s\nVersion: %d\nHostname: %s:%d\nTime: %s"}]}`, conn.RemoteAddr().String(), handshakePacket.ProtocolVersion, handshakePacket.Address, handshakePacket.Port, time.Now().Format(time.RFC822)))
+		sendWebhook(config.webhookPing, fmt.Sprintf(`{"embeds":[{"title":"Status","description":"IP: %s\nVersion: %d\nHostname: %s:%d\nTime: %s"}]}`, conn.RemoteAddr().String(), handshakePacket.ProtocolVersion, handshakePacket.Address, handshakePacket.Port, time.Now().Format(time.RFC822)))
 
 	case 2, 3:
 
-		err = packet.ReadFrom(conn)
+		err = packet.ReadFrom(conn, 0) // login start
 		if err != nil {
 			return
 		}
@@ -103,14 +99,12 @@ func handleConn(conn net.Conn) {
 
 		packet.Id = 0
 		packet.Data = kickMessage
-		err = packet.WriteTo(conn)
+		err = packet.WriteTo(conn) // disconnect
 		if err != nil {
 			return
 		}
 
-		sendWebhook(config.webhook_kick, fmt.Sprintf(`{"embeds":[{"title":"Login Attempt","description":"IP: %s\nUsername: %s\nVersion: %d\nHostname: %s:%d\nTime: %s"}]}`, conn.RemoteAddr().String(), name, handshakePacket.ProtocolVersion, handshakePacket.Address, handshakePacket.Port, time.Now().Format(time.RFC822)))
-	default:
-		return
+		sendWebhook(config.webhookKick, fmt.Sprintf(`{"embeds":[{"title":"Login Attempt","description":"IP: %s\nUsername: %s\nVersion: %d\nHostname: %s:%d\nTime: %s"}]}`, conn.RemoteAddr().String(), name, handshakePacket.ProtocolVersion, handshakePacket.Address, handshakePacket.Port, time.Now().Format(time.RFC822)))
 	}
 }
 
@@ -124,17 +118,16 @@ func getEnv(key, fallback string) string {
 
 func init() {
 	config.address = getEnv("ADDRESS", "0.0.0.0:25565")
-	config.kick_message = getEnv("KICK_MESSAGE", "You are not Whitelisted on this Server")
+	config.kickMessage = getEnv("KICK_MESSAGE", "You are not Whitelisted on this Server")
 	config.motd = getEnv("MOTD", "A Minecraft Server")
-	config.protocol_version = getEnv("PROTOCOL_VERSION", "772") // 1.21.1
-	config.protocol_text = getEnv("PROTOCOL_TEXT", "1.21.7")
-	config.favicon = getEnv("FAVICON", "")
-	config.webhook_ping = getEnv("WEBHOOK_PING", "")
-	config.webhook_kick = getEnv("WEBHOOK_KICK", "")
-	config.max_slots = getEnv("MAX_SLOTS", "20")
+	config.protocolVersion = getEnv("PROTOCOL_VERSION", "772")
+	config.protocolText = getEnv("PROTOCOL_TEXT", "1.21.7")
+	config.webhookPing = getEnv("WEBHOOK_PING", "")
+	config.webhookKick = getEnv("WEBHOOK_KICK", "")
+	config.maxSlots = getEnv("MAX_SLOTS", "20")
 
 	tmpBuf := bytes.NewBuffer(nil)
-	err := protocol.WriteString(tmpBuf, fmt.Sprintf(`{"version":{"name":"%s","protocol":%s},"players":{"max":%s,"online":0},"description":{"text":"%s"}}`, config.protocol_text, config.protocol_version, config.max_slots, config.motd))
+	err := protocol.WriteString(tmpBuf, fmt.Sprintf(`{"version":{"name":"%s","protocol":%s},"players":{"max":%s,"online":0},"description":{"text":"%s"}}`, config.protocolText, config.protocolVersion, config.maxSlots, config.motd))
 	if err != nil {
 		log.Fatalln("failed to encode motd:", err)
 	}
@@ -142,9 +135,9 @@ func init() {
 
 	tmpBuf = bytes.NewBuffer(nil)
 
-	err = protocol.WriteString(tmpBuf, `{"text": "`+config.kick_message+`"}`)
+	err = protocol.WriteString(tmpBuf, `{"text": "`+config.kickMessage+`"}`)
 	if err != nil {
-		log.Fatalln("failed to encode motd:", err)
+		log.Fatalln("failed to encode kick message:", err)
 	}
 	kickMessage = tmpBuf.Bytes()
 

@@ -3,6 +3,7 @@ package protocol
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -11,8 +12,7 @@ type Packet struct {
 	Data []byte
 }
 
-func (p *Packet) ReadFrom(r io.Reader) error {
-	// read length
+func (p *Packet) ReadFrom(r io.Reader, expectedId uint32) error {
 	length, err := readVarInt(r)
 	if err != nil {
 		return err
@@ -27,6 +27,12 @@ func (p *Packet) ReadFrom(r io.Reader) error {
 	p.Data = make([]byte, length)
 
 	_, err = io.ReadFull(r, p.Data)
+	if err != nil {
+		return err
+	}
+	if p.Id != expectedId {
+		return fmt.Errorf("unexpected packet id: received %d instead of %d", p.Id, expectedId)
+	}
 	return err
 }
 
