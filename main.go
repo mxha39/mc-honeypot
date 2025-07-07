@@ -111,7 +111,7 @@ func handleConn(conn net.Conn) {
 		n := counterJoin[ip+name]
 		counterMux.Unlock()
 
-		sendWebhook(config.webhookKick, fmt.Sprintf(`{"content": "Join From [%s](<https://laby.net/@%s>) [%s](https://ipinfo.io/%s/json) (%s:%d) v%d #%d"}`, name, name, conn.RemoteAddr().String(), ip, handshakePacket.Address, handshakePacket.Port, handshakePacket.ProtocolVersion, n))
+		sendWebhook(config.webhookKick, fmt.Sprintf(`{"content": "Join from [%s](<https://laby.net/@%s>) [%s](https://ipinfo.io/%s/json) (%s:%d) v%d #%d"}`, name, name, conn.RemoteAddr().String(), ip, handshakePacket.Address, handshakePacket.Port, handshakePacket.ProtocolVersion, n))
 	}
 }
 
