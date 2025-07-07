@@ -8,7 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
+	"sync"
 )
 
 var (
@@ -23,6 +23,9 @@ var (
 		webhookKick string
 	}
 	statusMessage, kickMessage []byte
+	counterPing                = make(map[string]uint32)
+	counterJoin                = make(map[string]uint32)
+	counterMux                 = &sync.Mutex{}
 )
 
 func main() {
@@ -56,6 +59,8 @@ func handleConn(conn net.Conn) {
 		return
 	}
 
+	ip := getIP(conn.RemoteAddr().String())
+
 	switch handshakePacket.NextState {
 	case 1:
 		err = packet.ReadFrom(conn, 0x00) // status request
@@ -63,7 +68,13 @@ func handleConn(conn net.Conn) {
 			fmt.Println(err)
 			return
 		}
-		sendWebhook(config.webhookPing, fmt.Sprintf(`{"embeds":[{"title":"Status","description":"IP: %s\nVersion: %d\nHostname: %s:%d\nTime: %s"}]}`, conn.RemoteAddr().String(), handshakePacket.ProtocolVersion, handshakePacket.Address, handshakePacket.Port, time.Now().Format(time.RFC822)))
+
+		counterMux.Lock()
+		counterPing[ip]++
+		n := counterPing[ip]
+		counterMux.Unlock()
+
+		sendWebhook(config.webhookPing, fmt.Sprintf(`{"content": "Ping from [%s](https://ipinfo.io/%s/json) (%s:%d) v%d #%d"}`, conn.RemoteAddr().String(), ip, handshakePacket.Address, handshakePacket.Port, handshakePacket.ProtocolVersion, n))
 
 		packet.Data = statusMessage
 		err = packet.WriteTo(conn) // status response
@@ -78,7 +89,7 @@ func handleConn(conn net.Conn) {
 		}
 
 		packet.WriteTo(conn) // ping response
-		
+
 	case 2, 3:
 
 		err = packet.ReadFrom(conn, 0) // login start
@@ -94,9 +105,22 @@ func handleConn(conn net.Conn) {
 		packet.Id = 0
 		packet.Data = kickMessage
 		packet.WriteTo(conn) // disconnect
-		
-		sendWebhook(config.webhookKick, fmt.Sprintf(`{"embeds":[{"title":"Login Attempt","description":"IP: %s\nUsername: %s\nVersion: %d\nHostname: %s:%d\nTime: %s"}]}`, conn.RemoteAddr().String(), name, handshakePacket.ProtocolVersion, handshakePacket.Address, handshakePacket.Port, time.Now().Format(time.RFC822)))
+
+		counterMux.Lock()
+		counterJoin[ip+name]++
+		n := counterJoin[ip+name]
+		counterMux.Unlock()
+
+		sendWebhook(config.webhookKick, fmt.Sprintf(`{"content": "Join From [%s](<https://laby.net/@%s>) [%s](https://ipinfo.io/%s/json) (%s:%d) v%d #%d"}`, name, name, conn.RemoteAddr().String(), ip, handshakePacket.Address, handshakePacket.Port, handshakePacket.ProtocolVersion, n))
 	}
+}
+
+func getIP(addr string) string {
+	ip, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+	return ip
 }
 
 func getEnv(key, fallback string) string {
