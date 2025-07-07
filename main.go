@@ -77,10 +77,7 @@ func handleConn(conn net.Conn) {
 			return
 		}
 
-		err = packet.WriteTo(conn) // ping response
-		if err != nil {
-			return
-		}
+		packet.WriteTo(conn) // ping response
 		
 	case 2, 3:
 
@@ -96,11 +93,8 @@ func handleConn(conn net.Conn) {
 
 		packet.Id = 0
 		packet.Data = kickMessage
-		err = packet.WriteTo(conn) // disconnect
-		if err != nil {
-			return
-		}
-
+		packet.WriteTo(conn) // disconnect
+		
 		sendWebhook(config.webhookKick, fmt.Sprintf(`{"embeds":[{"title":"Login Attempt","description":"IP: %s\nUsername: %s\nVersion: %d\nHostname: %s:%d\nTime: %s"}]}`, conn.RemoteAddr().String(), name, handshakePacket.ProtocolVersion, handshakePacket.Address, handshakePacket.Port, time.Now().Format(time.RFC822)))
 	}
 }
