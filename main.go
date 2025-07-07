@@ -63,9 +63,7 @@ func handleConn(conn net.Conn) {
 			fmt.Println(err)
 			return
 		}
-		if packet.Id != 0x00 {
-			return
-		}
+		sendWebhook(config.webhookPing, fmt.Sprintf(`{"embeds":[{"title":"Status","description":"IP: %s\nVersion: %d\nHostname: %s:%d\nTime: %s"}]}`, conn.RemoteAddr().String(), handshakePacket.ProtocolVersion, handshakePacket.Address, handshakePacket.Port, time.Now().Format(time.RFC822)))
 
 		packet.Data = statusMessage
 		err = packet.WriteTo(conn) // status response
@@ -83,8 +81,7 @@ func handleConn(conn net.Conn) {
 		if err != nil {
 			return
 		}
-		sendWebhook(config.webhookPing, fmt.Sprintf(`{"embeds":[{"title":"Status","description":"IP: %s\nVersion: %d\nHostname: %s:%d\nTime: %s"}]}`, conn.RemoteAddr().String(), handshakePacket.ProtocolVersion, handshakePacket.Address, handshakePacket.Port, time.Now().Format(time.RFC822)))
-
+		
 	case 2, 3:
 
 		err = packet.ReadFrom(conn, 0) // login start
